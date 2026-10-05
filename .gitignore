@@ -1,0 +1,16 @@
+# Dart / pub
+.dart_tool/
+build/
+pubspec.lock
+doc/api/
+coverage/
+
+# Flutter (example app)
+.flutter-plugins
+.flutter-plugins-dependencies
+
+# IDEs and OS files
+.idea/
+*.iml
+.vscode/
+.DS_Store

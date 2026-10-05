@@ -1,0 +1,4 @@
+tags:
+  # End-to-end tests against a real indiserver; see test/integration.
+  integration:
+    timeout: 3x

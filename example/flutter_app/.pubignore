@@ -1,0 +1,15 @@
+# Keep the published package small: only the example's Dart code is
+# included. Run `flutter create .` here to recreate the platform folders.
+android/
+ios/
+linux/
+macos/
+web/
+windows/
+build/
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.metadata
+pubspec.lock
+*.iml

@@ -1,0 +1,8 @@
+dartdoc:
+  categoryOrder:
+    - Client
+    - Model
+    - Device wrappers
+    - Transports
+    - Protocol
+    - Testing

@@ -1,0 +1,17 @@
+name: Publish to pub.dev
+
+# Publishing happens when a version tag is pushed, such as v0.2.0. pub.dev
+# only accepts automated publishing from tag pushes, and verifies the
+# repository through OpenID Connect, so no secret is needed.
+on:
+  push:
+    tags:
+      - 'v[0-9]+.[0-9]+.[0-9]+*'
+
+jobs:
+  publish:
+    permissions:
+      id-token: write
+    uses: dart-lang/setup-dart/.github/workflows/publish.yml@v1
+    with:
+      environment: pub.dev

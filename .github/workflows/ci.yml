@@ -1,0 +1,118 @@
+name: CI
+
+# Every push to main runs the full pipeline, including the integration tests
+# against a real indiserver.
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  # Cancel superseded runs on pull requests, never on main.
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+permissions:
+  contents: read
+
+jobs:
+  analyze:
+    name: Format, analyze and docs
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dart-lang/setup-dart@v1
+      - run: dart pub get
+      - name: Check formatting
+        run: dart format --output=none --set-exit-if-changed .
+      - name: Analyze
+        run: dart analyze --fatal-infos
+      - name: Analyze with the lowest allowed dependencies
+        run: dart pub downgrade && dart analyze --fatal-infos lib && dart pub upgrade
+      - name: Check documentation
+        run: dart doc --dry-run
+      - name: Check the package can be published
+        run: dart pub publish --dry-run
+
+  test:
+    name: Test (${{ matrix.os }}, Dart ${{ matrix.sdk }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        sdk: [stable]
+        include:
+          # The minimum SDK in pubspec.yaml.
+          - os: ubuntu-latest
+            sdk: 3.5.0
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dart-lang/setup-dart@v1
+        with:
+          sdk: ${{ matrix.sdk }}
+      - run: dart pub get
+      - run: dart test -x integration
+
+  test-web:
+    name: Test on the web (Chrome)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dart-lang/setup-dart@v1
+      - run: dart pub get
+      - run: dart test -p chrome -x integration
+
+  coverage:
+    name: Coverage
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dart-lang/setup-dart@v1
+      - run: dart pub get
+      - run: dart pub global activate coverage
+      - run: dart pub global run coverage:test_with_coverage -- -x integration
+      - uses: codecov/codecov-action@v5
+        with:
+          files: coverage/lcov.info
+          token: ${{ secrets.CODECOV_TOKEN }}
+          fail_ci_if_error: false
+
+  integration:
+    name: Integration (indiserver simulators)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dart-lang/setup-dart@v1
+      - name: Install indiserver and websockify
+        run: |
+          sudo add-apt-repository -y ppa:mutlaqja/ppa
+          sudo apt-get update
+          sudo apt-get install -y indi-bin websockify
+      - run: dart pub get
+      - run: dart test -t integration --reporter expanded
+
+  pana:
+    name: pub.dev score
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dart-lang/setup-dart@v1
+      - run: dart pub global activate pana
+      - run: dart pub global run pana --no-warning --exit-code-threshold 10 .
+
+  flutter-example:
+    name: Flutter example
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: example/flutter_app
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+      - run: flutter pub get
+      - run: flutter analyze
+      - run: flutter test
