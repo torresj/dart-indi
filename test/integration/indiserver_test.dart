@@ -108,8 +108,37 @@ void _tests() {
 
   test('slews the mount', () async {
     final mount = Telescope(await client.waitForDevice('Telescope Simulator'));
+    // Record what the driver reports, to explain a failure.
+    final history = <String>[];
+    final recording = mount.device.events.listen((event) {
+      switch (event) {
+        case PropertyEvent(:final property)
+            when property.name == 'EQUATORIAL_EOD_COORD':
+          final values = property.elements
+              .map((e) => '${e.name}=${(e as NumberElement).value}')
+              .join(' ');
+          history.add('${event.runtimeType} ${property.state.name} $values');
+        case MessageReceived(:final message):
+          history.add('message: ${message.text}');
+        default:
+          break;
+      }
+    });
+    addTearDown(recording.cancel);
+    printOnFailure('History:');
+    addTearDown(() => printOnFailure(history.join('\n')));
+
     await mount.connect();
-    await mount.device.waitForProperty<NumberProperty>('EQUATORIAL_EOD_COORD');
+    // The simulator reports real coordinates only from its first poll on;
+    // until then the property holds placeholders. Wait for that first
+    // update before commanding the mount, as an application should. A
+    // parked simulator doesn't poll, hence the fallback.
+    await mount.device
+        .eventsOf<PropertyUpdated>()
+        .firstWhere((e) => e.property.name == 'EQUATORIAL_EOD_COORD')
+        .then<void>((_) {})
+        .timeout(const Duration(seconds: 5), onTimeout: () {});
+    await mount.device.waitForProperty<SwitchProperty>('TELESCOPE_PARK');
     if (mount.isParked ?? false) await mount.unpark();
     final start = mount.coordinates!;
     final target = EquatorialCoordinates(
