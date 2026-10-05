@@ -21,7 +21,7 @@ jobs:
     name: Format, analyze and docs
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
       - uses: dart-lang/setup-dart@v1
       - run: dart pub get
       - name: Check formatting
@@ -48,7 +48,7 @@ jobs:
           - os: ubuntu-latest
             sdk: 3.5.0
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
       - uses: dart-lang/setup-dart@v1
         with:
           sdk: ${{ matrix.sdk }}
@@ -59,7 +59,7 @@ jobs:
     name: Test on the web (Chrome)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
       - uses: dart-lang/setup-dart@v1
       - run: dart pub get
       - run: dart test -p chrome -x integration
@@ -68,7 +68,7 @@ jobs:
     name: Coverage
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
       - uses: dart-lang/setup-dart@v1
       - run: dart pub get
       - run: dart pub global activate coverage
@@ -83,7 +83,7 @@ jobs:
     name: Integration (indiserver simulators)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
       - uses: dart-lang/setup-dart@v1
       - name: Install indiserver and websockify
         run: |
@@ -97,7 +97,7 @@ jobs:
     name: pub.dev score
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
       - uses: dart-lang/setup-dart@v1
       - run: dart pub global activate pana
       - run: dart pub global run pana --no-warning --exit-code-threshold 10 .
@@ -109,7 +109,7 @@ jobs:
       run:
         working-directory: example/flutter_app
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
       - uses: subosito/flutter-action@v2
         with:
           channel: stable
