@@ -298,13 +298,13 @@ final class IndiDevice {
           ],
         );
       },
+      // Drivers echo the requested value, so only rounding is tolerated. The
+      // element's step is a UI increment (libindi focusers use 1000), not a
+      // precision, so it must not widen the match.
       matches: (update) => values.entries.every((entry) {
         final element = update[entry.key];
         if (element == null) return false;
-        final tolerance = math.max(
-          element.step / 2,
-          1e-9 * math.max(1, entry.value.abs()),
-        );
+        final tolerance = 1e-9 * math.max(1, entry.value.abs());
         return (element.value - entry.value).abs() <= tolerance;
       }),
     );

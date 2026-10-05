@@ -469,6 +469,48 @@ void main() {
       expect(result.valueOf('DEC'), 2);
     });
 
+    test('afterBusy does not treat the step as a tolerance', () async {
+      // libindi focusers define ABS_FOCUS_POSITION with a step of 1000, a
+      // UI increment: a stale update at 50000 must not answer a move to
+      // 50100.
+      server.define(const DefNumberVector(
+        device: mountName,
+        name: 'ABS_FOCUS_POSITION',
+        elements: [
+          DefNumber(
+            name: 'FOCUS_ABSOLUTE_POSITION',
+            max: 100000,
+            step: 1000,
+            value: 50000,
+          ),
+        ],
+      ));
+      await mount.waitForProperty<NumberProperty>('ABS_FOCUS_POSITION');
+      final release = Completer<void>();
+      server.onNewVector = (command, server) async {
+        server.update(const SetNumberVector(
+          device: mountName,
+          name: 'ABS_FOCUS_POSITION',
+          state: PropertyState.ok,
+          elements: [OneNumber(name: 'FOCUS_ABSOLUTE_POSITION', value: 50000)],
+        ));
+        await release.future;
+        return null;
+      };
+      var done = false;
+      final move = mount.sendNumber(
+        'ABS_FOCUS_POSITION',
+        'FOCUS_ABSOLUTE_POSITION',
+        50100,
+        completion: CommandCompletion.afterBusy,
+      );
+      unawaited(move.then((_) => done = true));
+      await Future<void>.delayed(const Duration(milliseconds: 20));
+      expect(done, isFalse);
+      release.complete();
+      expect((await move).valueOf('FOCUS_ABSOLUTE_POSITION'), 50100);
+    });
+
     test('completion sent returns as soon as the command is written', () async {
       server.onNewVector = (command, server) => const [];
       final result = await mount.setSwitch(
