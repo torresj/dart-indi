@@ -81,7 +81,7 @@ jobs:
               printf "Line coverage: %d/%d = %.1f%%\n", hit, found, coverage
               if (coverage < 95) { print "Coverage is below 95%"; exit 1 }
             }' coverage/lcov.info
-      - uses: codecov/codecov-action@v5
+      - uses: codecov/codecov-action@v7
         with:
           files: coverage/lcov.info
           disable_search: true
