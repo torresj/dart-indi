@@ -11,6 +11,9 @@ wheels, domes and more. Build Flutter apps (or command-line tools) that talk
 to any INDI server, such as the one running on an Astroberry, StellarMate or
 any Linux box with `indiserver`.
 
+Guides and examples: **[dindi.torresj.es](https://dindi.torresj.es)**. API
+reference: [pub.dev](https://pub.dev/documentation/indi/latest/).
+
 ```dart
 final client = IndiClient(host: 'astroberry.local');
 await client.connect();
