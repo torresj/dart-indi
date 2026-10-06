@@ -114,7 +114,9 @@ final class IndiClient {
         connectTimeout: options.connectTimeout,
         reconnect: options.reconnect,
         heartbeat: options.heartbeat,
-        retryInitialConnect: options.retryInitialConnect,
+        // The BLOB connection opens after the main one succeeded, so a
+        // failure is likely transient: always retry it.
+        retryInitialConnect: isBlob || options.retryInitialConnect,
         logger: Logger(isBlob ? 'indi.connection.blob' : 'indi.connection'),
         onCommand: (command) => _handleCommand(command, fromBlob: isBlob),
         onProtocolError: (error) => _emit(ProtocolErrorReceived(error)),
@@ -144,6 +146,9 @@ final class IndiClient {
   /// Whether the client is connected to the server.
   bool get isConnected => _main.state is IndiConnected;
 
+  /// Whether [close] was called. A closed client can't be used anymore.
+  bool get isClosed => _closed;
+
   /// Connects to the server and requests the properties of every device
   /// (or of the watched devices).
   ///
@@ -156,8 +161,8 @@ final class IndiClient {
     await _main.start();
     final blob = _blob;
     if (blob != null) {
-      // The BLOB connection is optional for the session; failing to open it
-      // is logged and retried, but does not fail connect().
+      // The BLOB connection is secondary: it is retried in the background,
+      // and only logged if reconnecting gives up. It never fails connect().
       unawaited(blob.start().catchError(
             (Object e) => _log.warning('BLOB connection failed: $e'),
           ));
@@ -181,10 +186,12 @@ final class IndiClient {
   /// client can't be used anymore.
   Future<void> close() async {
     if (_closed) return;
+    // Set first, so everything that reacts to the disconnection can tell a
+    // deliberate close from a lost connection.
+    _closed = true;
     _settleTimer?.cancel();
     await _blob?.close();
     await _main.close();
-    _closed = true;
     _tracker.failAll(const IndiClosedException('The client was closed'));
     for (final ping in _pings.values) {
       ping.completeError(const IndiClosedException('The client was closed'));

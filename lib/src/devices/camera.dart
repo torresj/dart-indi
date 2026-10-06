@@ -113,9 +113,11 @@ final class Camera extends IndiDeviceWrapper with GuiderControls {
           case ConnectionStateChanged(:final state)
               when state is! IndiConnected:
             finish(() => completer.completeError(
-                  const IndiConnectionLostException(
-                    'Connection lost while waiting for an image',
-                  ),
+                  client.isClosed
+                      ? const IndiClosedException('The client was closed')
+                      : const IndiConnectionLostException(
+                          'Connection lost while waiting for an image',
+                        ),
                 ));
           default:
             break;

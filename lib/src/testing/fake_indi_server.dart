@@ -386,6 +386,10 @@ final class FakeServerConnection {
   void sendRaw(List<int> bytes) =>
       _side.add(bytes is Uint8List ? bytes : Uint8List.fromList(bytes));
 
+  /// Simulates a network failure: the client sees [error] and the
+  /// connection closes.
+  void fail(Object error) => (_side as InMemoryConnection).fail(error);
+
   /// Closes the connection.
   Future<void> close() => _side.close();
 }

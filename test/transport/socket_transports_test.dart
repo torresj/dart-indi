@@ -70,6 +70,7 @@ void main() {
       addTearDown(client.close);
       expect(client.transport, isA<TcpTransport>());
       final (mount, camera) = await connectAndSync(client);
+      final connection = server.connections.single;
       await mount.setSwitch('TELESCOPE_TRACK_STATE', 'TRACK_ON');
       expect(
           mount.getSwitch('TELESCOPE_TRACK_STATE')!.isOn('TRACK_ON'), isTrue);
@@ -92,6 +93,10 @@ void main() {
         elements: [OneBlob(name: 'CCD1', format: '.fits', data: image)],
       ));
       expect((await received)['CCD1']!.blob!.bytes, image);
+
+      // Closing the client closes the socket.
+      await client.close();
+      await eventually(() => connection.isClosed);
     });
 
     test('reconnects when the server closes the socket', () async {
@@ -105,6 +110,19 @@ void main() {
       await resumed;
       expect(client.device(mountName), same(mount));
       expect(mount.isAvailable, isTrue);
+    });
+
+    test('done completes when the connection closes', () async {
+      final listener = await tcpBridge(server);
+      addTearDown(listener.close);
+      final connection =
+          await TcpTransport('localhost', port: listener.port).connect();
+      var done = false;
+      unawaited(connection.done.then((_) => done = true));
+      await connection.close();
+      await connection.done;
+      expect(done, isTrue);
+      await connection.close(); // A second close is harmless.
     });
 
     test('fails to connect to a closed port', () async {
@@ -137,6 +155,18 @@ void main() {
         expect(mount.getNumber('EQUATORIAL_EOD_COORD')!.valueOf('RA'), 7);
       });
     }
+
+    test('done completes when the connection closes', () async {
+      final http = await webSocketBridge(server);
+      addTearDown(http.close);
+      final connection =
+          await WebSocketTransport(Uri.parse('ws://localhost:${http.port}'))
+              .connect(timeout: const Duration(seconds: 5));
+      connection.input.listen(null);
+      await connection.close();
+      await connection.done.timeout(const Duration(seconds: 5));
+      await connection.close();
+    });
 
     test('fails to connect to a server that is not there', () async {
       final http = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);

@@ -205,7 +205,7 @@ IndiProperty withState(IndiProperty property, PropertyState state) {
 
 TextProperty _copyText(
   TextProperty p, {
-  PropertyState? state,
+  required PropertyState state,
   double? timeout,
   DateTime? timestamp,
   List<TextElement>? elements,
@@ -215,7 +215,7 @@ TextProperty _copyText(
       name: p.name,
       label: p.label,
       group: p.group,
-      state: state ?? p.state,
+      state: state,
       permission: p.permission,
       timeout: timeout ?? p.timeout,
       timestamp: timestamp ?? p.timestamp,
@@ -224,7 +224,7 @@ TextProperty _copyText(
 
 NumberProperty _copyNumber(
   NumberProperty p, {
-  PropertyState? state,
+  required PropertyState state,
   double? timeout,
   DateTime? timestamp,
   List<NumberElement>? elements,
@@ -234,7 +234,7 @@ NumberProperty _copyNumber(
       name: p.name,
       label: p.label,
       group: p.group,
-      state: state ?? p.state,
+      state: state,
       permission: p.permission,
       timeout: timeout ?? p.timeout,
       timestamp: timestamp ?? p.timestamp,
@@ -243,7 +243,7 @@ NumberProperty _copyNumber(
 
 SwitchProperty _copySwitch(
   SwitchProperty p, {
-  PropertyState? state,
+  required PropertyState state,
   double? timeout,
   DateTime? timestamp,
   List<SwitchElement>? elements,
@@ -253,7 +253,7 @@ SwitchProperty _copySwitch(
       name: p.name,
       label: p.label,
       group: p.group,
-      state: state ?? p.state,
+      state: state,
       permission: p.permission,
       timeout: timeout ?? p.timeout,
       timestamp: timestamp ?? p.timestamp,
@@ -263,7 +263,7 @@ SwitchProperty _copySwitch(
 
 LightProperty _copyLight(
   LightProperty p, {
-  PropertyState? state,
+  required PropertyState state,
   DateTime? timestamp,
   List<LightElement>? elements,
 }) =>
@@ -272,14 +272,14 @@ LightProperty _copyLight(
       name: p.name,
       label: p.label,
       group: p.group,
-      state: state ?? p.state,
+      state: state,
       timestamp: timestamp ?? p.timestamp,
       elements: elements ?? p.elements,
     );
 
 BlobProperty _copyBlob(
   BlobProperty p, {
-  PropertyState? state,
+  required PropertyState state,
   double? timeout,
   DateTime? timestamp,
   List<BlobElement>? elements,
@@ -289,7 +289,7 @@ BlobProperty _copyBlob(
       name: p.name,
       label: p.label,
       group: p.group,
-      state: state ?? p.state,
+      state: state,
       permission: p.permission,
       timeout: timeout ?? p.timeout,
       timestamp: timestamp ?? p.timestamp,

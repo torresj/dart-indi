@@ -96,9 +96,6 @@ final class ConnectionSupervisor {
   /// The current state.
   IndiConnectionState get state => _state;
 
-  /// Whether the server answers keep-alive pings: `null` while unknown.
-  bool? get pingSupported => _pingSupported;
-
   /// Connects, and keeps the connection alive until [stop] or [close].
   ///
   /// Completes when connected. Throws an [IndiConnectionException] if the
@@ -281,10 +278,8 @@ final class ConnectionSupervisor {
     if (generation != _generation) return;
     _generation++;
     unawaited(_detach());
-    if (!_wanted) {
-      _setState(IndiDisconnected(error: error));
-      return;
-    }
+    // stop() invalidates the generation first, so a loss reported here
+    // always happens while the connection is wanted.
     logger.warning('Connection to ${transport.description} lost: $error');
     onConnectionLost(error);
     _isReconnect = true;

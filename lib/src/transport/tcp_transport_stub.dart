@@ -26,4 +26,7 @@ final class TcpTransport implements IndiTransport {
         'TCP sockets are not available on this platform; '
         'use WebSocketTransport',
       ));
+
+  @override
+  String toString() => 'TcpTransport($description)';
 }

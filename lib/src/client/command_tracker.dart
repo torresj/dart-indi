@@ -10,10 +10,6 @@ import 'client_options.dart';
 final class CommandTracker {
   final Map<(String, String), List<_Pending>> _pending = {};
 
-  /// The number of commands waiting for an answer.
-  int get pendingCount =>
-      _pending.values.fold(0, (count, list) => count + list.length);
-
   /// Waits for the answer to a command sent to [property] of [device].
   ///
   /// [matches] tells whether an update reports exactly the requested

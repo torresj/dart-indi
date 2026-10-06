@@ -73,10 +73,21 @@ jobs:
       - run: dart pub get
       - run: dart pub global activate coverage
       - run: dart pub global run coverage:test_with_coverage -- -x integration
+      - name: Check line coverage (minimum 95%)
+        run: |
+          awk -F: '/^LF:/ { found += $2 } /^LH:/ { hit += $2 }
+            END {
+              coverage = 100 * hit / found
+              printf "Line coverage: %d/%d = %.1f%%\n", hit, found, coverage
+              if (coverage < 95) { print "Coverage is below 95%"; exit 1 }
+            }' coverage/lcov.info
       - uses: codecov/codecov-action@v5
         with:
           files: coverage/lcov.info
+          disable_search: true
           token: ${{ secrets.CODECOV_TOKEN }}
+          # Pull requests from forks and Dependabot get no secrets; their
+          # uploads fail, which must not fail the build.
           fail_ci_if_error: false
 
   integration:

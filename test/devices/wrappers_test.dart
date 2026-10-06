@@ -301,6 +301,30 @@ void main() {
       expect(mount.isParked, isTrue);
     });
 
+    test('manual motion in every direction', () async {
+      server.define(_switches(
+        mountName,
+        'TELESCOPE_MOTION_WE',
+        ['MOTION_WEST', 'MOTION_EAST'],
+        rule: SwitchRule.atMostOne,
+      ));
+      await mount.device.waitForProperty<SwitchProperty>('TELESCOPE_MOTION_WE');
+      const elements = {
+        GuideDirection.north: ('TELESCOPE_MOTION_NS', 'MOTION_NORTH'),
+        GuideDirection.south: ('TELESCOPE_MOTION_NS', 'MOTION_SOUTH'),
+        GuideDirection.west: ('TELESCOPE_MOTION_WE', 'MOTION_WEST'),
+        GuideDirection.east: ('TELESCOPE_MOTION_WE', 'MOTION_EAST'),
+      };
+      for (final MapEntry(key: direction, value: (property, element))
+          in elements.entries) {
+        await mount.startMotion(direction);
+        expect(mount.device.getSwitch(property)!.isOn(element), isTrue,
+            reason: '$direction');
+        await mount.stopMotion(direction);
+        expect(mount.device.getSwitch(property)!.isOn(element), isFalse);
+      }
+    });
+
     test('pulse guides', () async {
       final received = recordReceived(server);
       await mount.pulseGuide(
@@ -712,6 +736,241 @@ void main() {
             .value,
         500,
       );
+    });
+  });
+
+  group('Camera edge cases', () {
+    late Camera camera;
+
+    setUp(() async {
+      defineCamera(server);
+      server
+        ..define(_numbers(cameraName, 'CCD_FRAME',
+            {'X': 0, 'Y': 0, 'WIDTH': 1280, 'HEIGHT': 1024}))
+        ..define(_switches(cameraName, 'CCD_FRAME_RESET', ['RESET'],
+            rule: SwitchRule.atMostOne))
+        ..define(_numbers(
+            cameraName, 'CCD_COOLER_POWER', {'CCD_COOLER_VALUE': 42},
+            max: 100))
+        ..define(_numbers(cameraName, 'CCD_GAIN', {'GAIN': 5}, max: 100))
+        ..define(_numbers(cameraName, 'CCD_OFFSET', {'OFFSET': 7}, max: 100))
+        ..define(_switches(
+            cameraName, 'CCD_VIDEO_STREAM', ['STREAM_ON', 'STREAM_OFF'],
+            on: 'STREAM_OFF'));
+      camera = Camera(await device(cameraName, 'CCD_VIDEO_STREAM'));
+    });
+
+    test('dedicated gain and offset properties', () async {
+      expect(camera.gain, 5);
+      expect(camera.offset, 7);
+      expect(camera.coolerPower, 42);
+      await camera.setGain(50);
+      expect(camera.gain, 50);
+      await camera.setOffset(9);
+      expect(camera.offset, 9);
+    });
+
+    test('setting a control the camera lacks fails', () async {
+      server.delete(cameraName, 'CCD_GAIN');
+      await eventually(() => camera.device['CCD_GAIN'] == null);
+      expect(camera.gain, isNull);
+      expect(() => camera.setGain(1), throwsA(isA<IndiNotFoundException>()));
+    });
+
+    test('expose with a region, and frame reset', () async {
+      const roi = SensorFrame(x: 10, y: 10, width: 64, height: 64);
+      await camera.expose(const Duration(seconds: 1), frame: roi);
+      expect(camera.frame, roi);
+      await camera.resetFrame();
+    });
+
+    test('expose fails before exposing when the value is invalid', () async {
+      await expectLater(
+        camera.expose(Duration.zero),
+        throwsA(isA<IndiValidationException>()),
+      );
+    });
+
+    test('exposureRemaining while exposing', () async {
+      server.onNewVector = (command, server) => [
+            SetNumberVector(
+              device: command.device,
+              name: command.name,
+              state: PropertyState.busy,
+              elements: const [
+                OneNumber(name: 'CCD_EXPOSURE_VALUE', value: 2.5),
+              ],
+            ),
+          ];
+      await camera.device.sendNumber(
+        'CCD_EXPOSURE',
+        'CCD_EXPOSURE_VALUE',
+        3,
+        completion: CommandCompletion.sent,
+      );
+      await eventually(
+          () => camera.exposureRemaining == const Duration(milliseconds: 2500));
+      expect(camera.isExposing, isTrue);
+    });
+
+    test('nextImage fails when the device is removed', () async {
+      final image = expectLater(
+        camera.nextImage(),
+        throwsA(isA<IndiNotFoundException>()),
+      );
+      server.delete(cameraName);
+      await image;
+    });
+
+    test('nextImage fails when the client is closed', () async {
+      final image = expectLater(
+        camera.nextImage(),
+        throwsA(isA<IndiClosedException>()),
+      );
+      await client.close();
+      await image;
+    });
+
+    test('nextImage times out', () async {
+      await expectLater(
+        camera.nextImage(timeout: const Duration(milliseconds: 10)),
+        throwsA(isA<IndiTimeoutException>()),
+      );
+    });
+
+    test('temperatureStream follows the sensor', () async {
+      final temperatures = <double>[];
+      camera.temperatureStream.listen(temperatures.add);
+      server.update(const SetNumberVector(
+        device: cameraName,
+        name: 'CCD_TEMPERATURE',
+        elements: [OneNumber(name: 'CCD_TEMPERATURE_VALUE', value: -5)],
+      ));
+      await eventually(() => temperatures.length == 2);
+      expect(temperatures, [20, -5]);
+    });
+
+    test('streaming enables images and toggles the stream', () async {
+      await camera.startStreaming();
+      expect(camera.device.getSwitch('CCD_VIDEO_STREAM')!.isOn('STREAM_ON'),
+          isTrue);
+      expect(
+          client.blobMode(device: cameraName, property: 'CCD1'), BlobMode.also);
+      await camera.stopStreaming();
+      expect(camera.device.getSwitch('CCD_VIDEO_STREAM')!.isOn('STREAM_OFF'),
+          isTrue);
+    });
+  });
+
+  group('wrapper streams and remaining commands', () {
+    test('Telescope', () async {
+      defineMount(server);
+      server
+        ..define(_numbers(mountName, 'TARGET_EOD_COORD', {'RA': 6, 'DEC': 7}))
+        ..define(_numbers(mountName, 'HORIZONTAL_COORD', {'ALT': 10, 'AZ': 20}))
+        ..define(const DefTextVector(
+          device: mountName,
+          name: 'TIME_UTC',
+          elements: [DefText(name: 'UTC'), DefText(name: 'OFFSET')],
+        ))
+        ..define(_numbers(mountName, 'TELESCOPE_TIMED_GUIDE_NS',
+            {'TIMED_GUIDE_N': 0, 'TIMED_GUIDE_S': 0},
+            max: 60000))
+        ..define(_numbers(mountName, 'TELESCOPE_TIMED_GUIDE_WE',
+            {'TIMED_GUIDE_W': 0, 'TIMED_GUIDE_E': 0},
+            max: 60000));
+      final mount =
+          Telescope(await device(mountName, 'TELESCOPE_TIMED_GUIDE_WE'));
+      expect(mount.targetCoordinates,
+          const EquatorialCoordinates(raHours: 6, decDegrees: 7));
+      expect(mount.driverInfo?.executable, 'indi_simulator_telescope');
+      expect(
+        await mount.horizontalCoordinatesStream.first,
+        const HorizontalCoordinates(altitudeDegrees: 10, azimuthDegrees: 20),
+      );
+      final received = recordReceived(server);
+      for (final direction in [
+        GuideDirection.north,
+        GuideDirection.south,
+        GuideDirection.west,
+      ]) {
+        await mount.pulseGuide(direction, const Duration(milliseconds: 100));
+      }
+      expect(
+        received
+            .whereType<NewNumberVector>()
+            .map((c) => c.elements.firstWhere((e) => e.value > 0).name),
+        ['TIMED_GUIDE_N', 'TIMED_GUIDE_S', 'TIMED_GUIDE_W'],
+      );
+      final local = DateTime(2026, 10, 6, 22);
+      await mount.setTime(local);
+      final time = server.definition(mountName, 'TIME_UTC')! as DefTextVector;
+      expect(time.elements.first.value, formatIndiTimestamp(local));
+      expect(
+        time.elements.last.value,
+        formatIndiNumber(local.timeZoneOffset.inMinutes / 60, '%.2f'),
+      );
+    });
+
+    test('Focuser, FilterWheel, Dome, Rotator and Gps', () async {
+      server
+        ..define(_numbers(
+            'Focuser', 'ABS_FOCUS_POSITION', {'FOCUS_ABSOLUTE_POSITION': 100},
+            max: 1000))
+        ..define(_numbers('Focuser', 'FOCUS_SPEED', {'FOCUS_SPEED_VALUE': 1},
+            max: 10))
+        ..define(_switches('Focuser', 'FOCUS_REVERSE_MOTION',
+            ['INDI_ENABLED', 'INDI_DISABLED'],
+            on: 'INDI_DISABLED'))
+        ..define(_numbers('Wheel', 'FILTER_SLOT', {'FILTER_SLOT_VALUE': 1},
+            min: 1, max: 5))
+        ..define(_numbers(
+            'Dome', 'ABS_DOME_POSITION', {'DOME_ABSOLUTE_POSITION': 10},
+            max: 360))
+        ..define(
+            _switches('Dome', 'DOME_PARK', ['PARK', 'UNPARK'], on: 'UNPARK'))
+        ..define(
+            _numbers('Rotator', 'ABS_ROTATOR_ANGLE', {'ANGLE': 30}, max: 360))
+        ..define(_switches('Rotator', 'ROTATOR_ABORT_MOTION', ['ABORT'],
+            rule: SwitchRule.atMostOne))
+        ..define(_switches(
+            'Rotator', 'ROTATOR_REVERSE', ['INDI_ENABLED', 'INDI_DISABLED'],
+            on: 'INDI_DISABLED'))
+        ..define(_switches('Gps', 'GPS_REFRESH', ['REFRESH'],
+            rule: SwitchRule.atMostOne));
+
+      final focuser = Focuser(await device('Focuser', 'FOCUS_REVERSE_MOTION'));
+      expect(await focuser.positionStream.first, 100);
+      await focuser.setSpeed(5);
+      await focuser.setReversed(true);
+      expect(
+          focuser.device
+              .getSwitch('FOCUS_REVERSE_MOTION')!
+              .isOn('INDI_ENABLED'),
+          isTrue);
+
+      final wheel = FilterWheel(await device('Wheel', 'FILTER_SLOT'));
+      expect(await wheel.slotStream.first, 1);
+      expect(wheel.isMoving, isFalse);
+      expect(wheel.filterNames, isEmpty);
+      expect(wheel.currentFilter, isNull);
+
+      final dome = Dome(await device('Dome', 'DOME_PARK'));
+      expect(await dome.azimuthStream.first, 10);
+      expect(dome.isMoving, isFalse);
+      expect(dome.shutterState, isNull);
+      await dome.park();
+      expect(dome.isParked, isTrue);
+
+      final rotator = Rotator(await device('Rotator', 'ROTATOR_REVERSE'));
+      expect(await rotator.angleStream.first, 30);
+      await rotator.abort();
+      await rotator.setReversed(true);
+
+      final gps = Gps(await device('Gps', 'GPS_REFRESH'));
+      expect(gps.location, isNull);
+      expect(gps.time, isNull);
+      await gps.refresh();
     });
   });
 }

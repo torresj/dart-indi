@@ -45,14 +45,21 @@ final class TcpTransport implements IndiTransport {
 
 final class _TcpConnection implements IndiConnection {
   _TcpConnection(this._socket) {
-    // Write errors are reported through `done`; don't let them escape as
-    // unhandled errors.
-    _done = _socket.done.then<void>((_) {}, onError: (Object _) {});
+    // Write errors also complete `done`; don't let them escape as unhandled
+    // errors.
+    unawaited(
+      _socket.done
+          .then<void>((_) => _finish(), onError: (Object _) => _finish()),
+    );
   }
 
   final Socket _socket;
-  late final Future<void> _done;
+  final Completer<void> _done = Completer<void>();
   bool _closed = false;
+
+  void _finish() {
+    if (!_done.isCompleted) _done.complete();
+  }
 
   @override
   Stream<Uint8List> get input => _socket;
@@ -68,13 +75,17 @@ final class _TcpConnection implements IndiConnection {
   }
 
   @override
-  Future<void> close() async {
-    if (_closed) return _done;
-    _closed = true;
-    _socket.destroy();
-    return _done;
+  Future<void> close() {
+    if (!_closed) {
+      _closed = true;
+      // destroy() tears the socket down at once. Its `done` future only
+      // completes once the input was listened to, so don't wait for it.
+      _socket.destroy();
+      _finish();
+    }
+    return _done.future;
   }
 
   @override
-  Future<void> get done => _done;
+  Future<void> get done => _done.future;
 }
