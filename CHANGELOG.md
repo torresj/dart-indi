@@ -1,3 +1,16 @@
+## 0.1.1
+
+- Fix: closing a `TcpTransport` connection could wait forever when its
+  input was never listened to.
+- Fix: `Camera.expose` and `Camera.nextImage` now fail with
+  `IndiClosedException`, instead of `IndiConnectionLostException`, when
+  the client is closed while they wait.
+- The dedicated BLOB connection (`separateBlobConnection`) keeps retrying
+  when its first connection attempt fails, instead of giving up silently.
+- New `IndiClient.isClosed`.
+- New `FakeServerConnection.fail` to simulate network errors in tests.
+- Test coverage raised to 99.6% of lines.
+
 ## 0.1.0
 
 First release.
