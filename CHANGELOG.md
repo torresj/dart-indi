@@ -1,3 +1,8 @@
+## 0.1.2
+
+- Link the documentation site, https://dindi.torresj.es, from the package
+  page and the README.
+
 ## 0.1.1
 
 - Fix: closing a `TcpTransport` connection could wait forever when its
