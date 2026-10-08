@@ -1,10 +1,13 @@
 version: 2
 updates:
+  # Changes go straight to main, so Dependabot opens no pull requests.
   - package-ecosystem: github-actions
     directory: /
     schedule:
       interval: monthly
+    open-pull-requests-limit: 0
   - package-ecosystem: pub
     directory: /
     schedule:
       interval: monthly
+    open-pull-requests-limit: 0
