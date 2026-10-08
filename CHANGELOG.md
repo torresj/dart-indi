@@ -1,3 +1,18 @@
+## 0.1.3
+
+- New device wrappers:
+  - `IoBox`, for devices with digital inputs, digital outputs and analog
+    inputs, such as relay boxes: channels with their names, `setOutput`
+    and pulse lengths.
+  - `SkyQualityMeter`: sky brightness in mag/arcsec², plus the sensor
+    temperature and readings.
+  - `PolarAligner`, for polar alignment correctors: `moveBy` in azimuth
+    and altitude, `abort`, speed, position and axis reversal.
+- New `Rotator.isReversed`.
+- New `DustCap.isMoving`, `DustCap.canAbort` and `DustCap.abort`.
+- New value classes `IoChannel` and `AnalogInput`, and the standard
+  property and element names for the new wrappers.
+
 ## 0.1.2
 
 - Link the documentation site, https://dindi.torresj.es, from the package

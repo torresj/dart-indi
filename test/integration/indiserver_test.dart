@@ -26,8 +26,26 @@ const List<String> drivers = [
   'indi_simulator_wheel',
 ];
 
+/// Simulators for the accessory wrappers. Older INDI releases lack some of
+/// them (INDI 1.9 has no I/O or PAC simulator), so each one runs, and is
+/// tested, only when installed.
+const List<String> accessoryDrivers = [
+  'indi_simulator_rotator',
+  'indi_simulator_dustcover',
+  'indi_simulator_lightpanel',
+  'indi_simulator_sqm',
+  'indi_simulator_io',
+  'indi_simulator_pac',
+];
+
 final bool hasIndiServer = _onPath('indiserver');
 final bool hasWebsockify = _onPath('websockify');
+final List<String> installedAccessories =
+    accessoryDrivers.where(_onPath).toList();
+
+/// A skip reason when [driver] is not installed.
+Object _needs(String driver) =>
+    installedAccessories.contains(driver) ? false : '$driver is not installed';
 
 bool _onPath(String executable) {
   try {
@@ -40,7 +58,7 @@ bool _onPath(String executable) {
 Future<Process> startServer() async {
   final process = await Process.start(
     'indiserver',
-    ['-p', '$port', ...drivers],
+    ['-p', '$port', ...drivers, ...installedAccessories],
   );
   process.stderr.transform(utf8.decoder).listen((line) {
     if (Platform.environment['INDI_VERBOSE'] != null) stderr.write(line);
@@ -176,6 +194,93 @@ void _tests() {
     await wheel.selectSlot(slot, timeout: const Duration(minutes: 1));
     expect(wheel.slot, slot);
   });
+
+  test(
+    'moves the rotator',
+    () async {
+      final rotator = Rotator(await client.waitForDevice('Rotator Simulator'));
+      await rotator.connect();
+      await rotator.device.waitForProperty<NumberProperty>('ABS_ROTATOR_ANGLE');
+      final target = ((rotator.angle ?? 0) + 10) % 360;
+      await rotator.moveTo(target, timeout: const Duration(minutes: 1));
+      expect(rotator.angle, closeTo(target, 0.01));
+    },
+    skip: _needs('indi_simulator_rotator'),
+  );
+
+  test(
+    'closes and opens the dust cover',
+    () async {
+      final cap = DustCap(await client.waitForDevice('Dust Cover Simulator'));
+      await cap.connect();
+      await cap.device.waitForProperty<SwitchProperty>('CAP_PARK');
+      await cap.close(timeout: const Duration(minutes: 1));
+      expect(cap.isClosed, isTrue);
+      await cap.open(timeout: const Duration(minutes: 1));
+      expect(cap.isClosed, isFalse);
+    },
+    skip: _needs('indi_simulator_dustcover'),
+  );
+
+  test(
+    'lights the light panel',
+    () async {
+      final light =
+          LightBox(await client.waitForDevice('Light Panel Simulator'));
+      await light.connect();
+      await light.device
+          .waitForProperty<NumberProperty>('FLAT_LIGHT_INTENSITY');
+      await light.setLight(true);
+      await light.setBrightness(128);
+      expect(light.isOn, isTrue);
+      expect(light.brightness, 128);
+      await light.setLight(false);
+      expect(light.isOn, isFalse);
+    },
+    skip: _needs('indi_simulator_lightpanel'),
+  );
+
+  test(
+    'reads the sky quality meter',
+    () async {
+      final sqm = SkyQualityMeter(await client.waitForDevice('SQM Simulator'));
+      await sqm.connect();
+      await sqm.device.waitForProperty<NumberProperty>('SKY_QUALITY');
+      expect(sqm.skyBrightness, isNotNull);
+    },
+    skip: _needs('indi_simulator_sqm'),
+  );
+
+  test(
+    'switches an output',
+    () async {
+      final io = IoBox(await client.waitForDevice('Simulator IO'));
+      await io.connect();
+      await io.device.waitForProperty<SwitchProperty>('DIGITAL_OUTPUT_1');
+      expect(io.digitalInputs, isNotEmpty);
+      await io.setOutput(1, true);
+      expect(io.digitalOutputs.first.isOn, isTrue);
+      await io.setOutput(1, false);
+      expect(io.digitalOutputs.first.isOn, isFalse);
+    },
+    skip: _needs('indi_simulator_io'),
+  );
+
+  test(
+    'moves the polar alignment corrector',
+    () async {
+      final pac = PolarAligner(
+        await client.waitForDevice('Alignment Correction Simulator'),
+      );
+      await pac.connect();
+      await pac.device.waitForProperty<NumberProperty>('PAC_MANUAL_ADJUSTMENT');
+      // The property is write only, but the driver still reports Busy and
+      // then Ok, which is what moveBy waits for.
+      await pac.moveBy(azimuth: 0.1, timeout: const Duration(minutes: 1));
+      expect(pac.isMoving, isFalse);
+    },
+    skip: _needs('indi_simulator_pac'),
+  );
 
   test('reconnects and resumes after indiserver restarts', () async {
     final mount = await client.waitForDevice('Telescope Simulator');

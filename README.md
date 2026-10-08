@@ -40,8 +40,9 @@ final image = await camera.expose(const Duration(seconds: 30));
 - **Awaitable commands**: `await mount.slewTo(...)` completes when the driver
   reports the slew finished, and throws with the driver's message if it fails.
 - **Typed device wrappers** for mounts, cameras, guiders, focusers, filter
-  wheels, domes, rotators, weather stations, GPS, dust caps and light boxes,
-  on top of a fully generic API for anything else.
+  wheels, domes, rotators, weather stations, GPS, dust caps, light boxes,
+  I/O boxes, sky quality meters and polar alignment correctors, on top of a
+  fully generic API for anything else.
 - **Built for Flutter**: immutable property snapshots and streams that emit
   the current value first, ready for `StreamBuilder`.
 - **Fast with large images**: BLOBs are base64-decoded while they stream in
@@ -162,17 +163,22 @@ await camera.sendNumber('CCD_TEMPERATURE', 'CCD_TEMPERATURE_VALUE', -10);
 
 The wrappers give standard devices meaningful, typed methods:
 
-| Wrapper       | Highlights                                                                 |
-|---------------|-----------------------------------------------------------------------------|
-| `Telescope`   | `slewTo`, `syncTo`, `abort`, `park`, tracking and rates, motion, site, time |
-| `Camera`      | `expose`, `images`, frame type, binning, ROI, cooling, gain, offset, streaming |
-| `Focuser`     | `moveTo`, `moveBy`, `abort`, `sync`, temperature                             |
-| `FilterWheel` | `selectFilter('Ha')`, `selectSlot`, filter names                             |
-| `Dome`        | shutter, `moveTo` azimuth, park, slaving                                     |
-| `Rotator`     | `moveTo`, `sync`, reverse                                                    |
-| `Guider`      | `pulseGuide` (also available on `Telescope` and `Camera`)                    |
-| `Weather`     | `isSafe`, status per parameter, readings                                     |
-| `Gps`, `DustCap`, `LightBox` | location and time; open and close; light and brightness       |
+| Wrapper           | Highlights                                                                     |
+|-------------------|--------------------------------------------------------------------------------|
+| `Telescope`       | `slewTo`, `syncTo`, `abort`, `park`, tracking and rates, motion, site, time     |
+| `Camera`          | `expose`, `images`, frame type, binning, ROI, cooling, gain, offset, streaming |
+| `Focuser`         | `moveTo`, `moveBy`, `abort`, `sync`, temperature                               |
+| `FilterWheel`     | `selectFilter('Ha')`, `selectSlot`, filter names                               |
+| `Dome`            | shutter, `moveTo` azimuth, park, slaving                                       |
+| `Rotator`         | `moveTo`, `sync`, `abort`, `isReversed` and `setReversed`                      |
+| `Guider`          | `pulseGuide` (also available on `Telescope` and `Camera`)                      |
+| `Weather`         | `isSafe`, status per parameter, readings                                       |
+| `Gps`             | location and time, `refresh`                                                   |
+| `DustCap`         | `open`, `close`, `isMoving`, `abort`                                           |
+| `LightBox`        | light on and off, brightness                                                   |
+| `IoBox`           | digital inputs and outputs with their names, analog inputs, `setOutput`, pulse mode |
+| `SkyQualityMeter` | `skyBrightness` in mag/arcsec², sensor temperature and readings                |
+| `PolarAligner`    | `moveBy` azimuth and altitude, `abort`, speed, position, reverse               |
 
 ```dart
 final wheel = FilterWheel(await client.waitForDevice('Filter Simulator'));
@@ -180,6 +186,9 @@ await wheel.selectFilter('Ha');
 
 final focuser = Focuser(await client.waitForDevice('Focuser Simulator'));
 await focuser.moveBy(-150);
+
+final relays = IoBox(await client.waitForDevice('Simulator IO'));
+await relays.setOutput(1, true);
 ```
 
 Wrappers keep no state and expose the underlying `IndiDevice` as `device`, so

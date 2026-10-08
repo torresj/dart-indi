@@ -48,3 +48,13 @@ indiserver's `ClInfo.cpp`.
 | Servers send `pingRequest` to clients on the fast-BLOB Unix socket. | The client always answers with `pingReply`. |
 | indiserver disconnects clients that fall more than `-m` MB behind. | The decoder never blocks and processes data as it arrives. |
 | `DRIVER_INFO.DRIVER_INTERFACE` is a bit mask of device kinds. | `DeviceInterface`, `IndiDevice.interfaces`, `IndiClient.devicesWith`. |
+
+## Device wrappers
+
+| Fact | Where it is handled |
+|------|---------------------|
+| Some drivers declare no interface: the SQM simulator reports `DRIVER_INTERFACE` 0, even once connected. | Documented on `SkyQualityMeter`: find these devices by their `SKY_QUALITY` property. |
+| The output interface numbers `DIGITAL_OUTPUT_n` from 1, but its pulse lengths `PULSE_n` from 0. | `IoBox` takes output numbers everywhere and maps them to `PULSE_{n-1}`. |
+| The I/O label properties share the channel prefix (`DIGITAL_INPUT_LABELS`). | `IoBox` only reads properties whose suffix is a number. |
+| `PAC_MANUAL_ADJUSTMENT` is write only, yet the driver still reports `Busy` and then `Ok` around the motion. | `PolarAligner.moveBy` waits with `CommandCompletion.afterBusy`, like the other motions. |
+| A dust cap can only abort when the driver defines `CAP_ABORT`. | `DustCap.canAbort`. |

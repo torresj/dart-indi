@@ -46,6 +46,13 @@ final class Rotator extends IndiDeviceWrapper {
         degrees,
       );
 
+  /// Whether the direction of rotation is reversed, or `null` if the
+  /// driver can't reverse it.
+  bool? get isReversed => switchValue(
+        StandardProperties.rotatorReverse,
+        StandardElements.indiEnabled,
+      );
+
   /// Reverses the direction of rotation.
   Future<void> setReversed(bool reversed) => device.setSwitch(
         StandardProperties.rotatorReverse,

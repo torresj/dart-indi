@@ -59,6 +59,7 @@ Future<List<IndiCommand>?> _driver(
     'ABS_ROTATOR_ANGLE',
     'TELESCOPE_TIMED_GUIDE_NS',
     'TELESCOPE_TIMED_GUIDE_WE',
+    'PAC_MANUAL_ADJUSTMENT',
   };
   if (command is NewNumberVector && motions.contains(command.name)) {
     server.update(SetNumberVector(
@@ -609,6 +610,7 @@ void main() {
         ..define(_numbers(name, 'ABS_ROTATOR_ANGLE', {'ANGLE': 0}, max: 360))
         ..define(_numbers(name, 'SYNC_ROTATOR_ANGLE', {'ANGLE': 0}, max: 360));
       final rotator = Rotator(await device(name, 'SYNC_ROTATOR_ANGLE'));
+      expect(rotator.isReversed, isNull);
       await rotator.moveTo(45);
       expect(rotator.angle, 45);
       expect(rotator.isMoving, isFalse);
@@ -684,6 +686,8 @@ void main() {
       final cap = DustCap(panel);
       final light = LightBox(panel);
       expect(cap.isClosed, isFalse);
+      expect(cap.isMoving, isFalse);
+      expect(cap.canAbort, isFalse);
       await cap.close();
       expect(cap.isClosed, isTrue);
       await light.setLight(true);
@@ -692,6 +696,220 @@ void main() {
       expect(light.brightness, 128);
       await cap.open();
       expect(cap.isClosed, isFalse);
+    });
+
+    test('DustCap motion and abort', () async {
+      const name = 'Motorized Cap';
+      server
+        ..define(_switches(name, 'CAP_PARK', ['PARK', 'UNPARK'], on: 'PARK'))
+        ..define(_switches(name, 'CAP_ABORT', ['ABORT'],
+            rule: SwitchRule.atMostOne));
+      final cap = DustCap(await device(name, 'CAP_ABORT'));
+      expect(cap.canAbort, isTrue);
+      server.update(const SetSwitchVector(
+        device: name,
+        name: 'CAP_PARK',
+        state: PropertyState.busy,
+        elements: [],
+      ));
+      await eventually(() => cap.isMoving);
+      await cap.abort();
+    });
+  });
+
+  group('IoBox, SkyQualityMeter and PolarAligner', () {
+    DefSwitchVector channel(
+      String device,
+      String name,
+      String label, {
+      bool on = false,
+      bool output = false,
+    }) =>
+        DefSwitchVector(
+          device: device,
+          name: name,
+          label: label,
+          perm: output
+              ? PropertyPermission.readWrite
+              : PropertyPermission.readOnly,
+          rule: output ? SwitchRule.atMostOne : SwitchRule.oneOfMany,
+          elements: [
+            DefSwitch(
+                name: 'OFF', state: on ? SwitchState.off : SwitchState.on),
+            DefSwitch(name: 'ON', state: on ? SwitchState.on : SwitchState.off),
+          ],
+        );
+
+    test('IoBox', () async {
+      const name = 'Simulator IO';
+      server
+        ..define(channel(name, 'DIGITAL_INPUT_2', 'Input #2', on: true))
+        ..define(channel(name, 'DIGITAL_INPUT_1', 'Input #1'))
+        ..define(const DefTextVector(
+          device: name,
+          name: 'DIGITAL_INPUT_LABELS',
+          elements: [
+            DefText(name: 'DIGITAL_INPUT_1', value: 'Rain'),
+            DefText(name: 'DIGITAL_INPUT_2', value: ''),
+          ],
+        ))
+        ..define(channel(name, 'DIGITAL_OUTPUT_1', 'Output #1', output: true))
+        ..define(const DefTextVector(
+          device: name,
+          name: 'DIGITAL_OUTPUT_LABELS',
+          elements: [DefText(name: 'DIGITAL_OUTPUT_1', value: 'Dew heater')],
+        ))
+        ..define(_numbers(name, 'PULSE_0', {'DURATION': 0}, max: 60000))
+        ..define(const DefNumberVector(
+          device: name,
+          name: 'ANALOG_INPUT_1',
+          label: 'Voltage',
+          perm: PropertyPermission.readOnly,
+          elements: [DefNumber(name: 'ANALOG_INPUT_1', value: 12.5)],
+        ))
+        ..define(const DefNumberVector(
+          device: name,
+          name: 'ANALOG_INPUT_2',
+          elements: [],
+        ));
+      final io = IoBox(await device(name, 'ANALOG_INPUT_2'));
+      expect(io.digitalInputs, const [
+        IoChannel(number: 1, label: 'Rain', isOn: false),
+        IoChannel(number: 2, label: 'Input #2', isOn: true),
+      ]);
+      expect(io.digitalOutputs, const [
+        IoChannel(number: 1, label: 'Dew heater', isOn: false),
+      ]);
+      expect(io.analogInputs, const [
+        AnalogInput(number: 1, label: 'Voltage', value: 12.5),
+      ]);
+
+      await io.setOutput(1, true);
+      expect(io.digitalOutputs.single.isOn, isTrue);
+      await io.setOutput(1, false);
+      expect(io.digitalOutputs.single.isOn, isFalse);
+
+      expect(io.pulseDuration(1), Duration.zero);
+      expect(io.pulseDuration(2), isNull);
+      await io.setPulseDuration(1, const Duration(milliseconds: 500));
+      expect(io.pulseDuration(1), const Duration(milliseconds: 500));
+    });
+
+    test('IoBox without labels', () async {
+      const name = 'Relays';
+      server.define(channel(name, 'DIGITAL_OUTPUT_1', 'Relay', output: true));
+      final io = IoBox(await device(name, 'DIGITAL_OUTPUT_1'));
+      expect(io.digitalOutputs.single.label, 'Relay');
+      expect(io.digitalInputs, isEmpty);
+      expect(io.analogInputs, isEmpty);
+    });
+
+    test('value classes', () {
+      const channel = IoChannel(number: 1, label: 'Relay', isOn: true);
+      expect(
+        channel,
+        const IoChannel(number: 1, label: 'Relay', isOn: true),
+      );
+      expect(
+        channel.hashCode,
+        const IoChannel(number: 1, label: 'Relay', isOn: true).hashCode,
+      );
+      expect(channel.toString(), 'IoChannel(1, Relay, on)');
+      expect(
+        const IoChannel(number: 1, label: 'Relay', isOn: false).toString(),
+        'IoChannel(1, Relay, off)',
+      );
+      const input = AnalogInput(number: 2, label: 'Volts', value: 12.5);
+      expect(input, const AnalogInput(number: 2, label: 'Volts', value: 12.5));
+      expect(
+        input.hashCode,
+        const AnalogInput(number: 2, label: 'Volts', value: 12.5).hashCode,
+      );
+      expect(input.toString(), 'AnalogInput(2, Volts, 12.5)');
+    });
+
+    test('SkyQualityMeter', () async {
+      const name = 'SQM Simulator';
+      server.define(_numbers(name, 'SKY_QUALITY', {
+        'SKY_BRIGHTNESS': 20.5,
+        'SENSOR_FREQUENCY': 30,
+        'SENSOR_COUNTS': 1000,
+        'SENSOR_PERIOD': 0.1,
+        'SKY_TEMPERATURE': 12,
+      }));
+      final sqm = SkyQualityMeter(await device(name, 'SKY_QUALITY'));
+      expect(sqm.skyBrightness, 20.5);
+      expect(sqm.sensorFrequency, 30);
+      expect(sqm.sensorCounts, 1000);
+      expect(sqm.sensorPeriod, 0.1);
+      expect(sqm.temperature, 12);
+      final readings = <double>[];
+      sqm.skyBrightnessStream.listen(readings.add);
+      server.update(const SetNumberVector(
+        device: name,
+        name: 'SKY_QUALITY',
+        elements: [OneNumber(name: 'SKY_BRIGHTNESS', value: 21)],
+      ));
+      await eventually(() => readings.length == 2);
+      expect(readings, [20.5, 21]);
+    });
+
+    test('PolarAligner', () async {
+      const name = 'Alignment Correction Simulator';
+      server
+        ..define(const DefNumberVector(
+          device: name,
+          name: 'PAC_MANUAL_ADJUSTMENT',
+          perm: PropertyPermission.writeOnly,
+          elements: [
+            DefNumber(name: 'MANUAL_AZ_STEP', min: -10, max: 10),
+            DefNumber(name: 'MANUAL_ALT_STEP', min: -10, max: 10),
+          ],
+        ))
+        ..define(_switches(name, 'PAC_ABORT_MOTION', ['ABORT'],
+            rule: SwitchRule.atMostOne))
+        ..define(
+            _numbers(name, 'PAC_SPEED', {'PAC_SPEED_VALUE': 1}, min: 1, max: 5))
+        ..define(_switches(
+            name, 'PAC_AZ_REVERSE', ['INDI_ENABLED', 'INDI_DISABLED'],
+            on: 'INDI_DISABLED'))
+        ..define(_switches(
+            name, 'PAC_ALT_REVERSE', ['INDI_ENABLED', 'INDI_DISABLED'],
+            on: 'INDI_DISABLED'))
+        ..define(_numbers(
+            name, 'PAC_POSITION', {'POSITION_AZ': 1.5, 'POSITION_ALT': -0.5},
+            min: -360, max: 360));
+      final pac = PolarAligner(await device(name, 'PAC_POSITION'));
+      expect(pac.isMoving, isFalse);
+      expect(
+        pac.position,
+        const HorizontalCoordinates(altitudeDegrees: -0.5, azimuthDegrees: 1.5),
+      );
+      await pac.moveBy(azimuth: 0.25);
+      await pac.moveBy(altitude: -0.1);
+      await pac.abort();
+      expect(pac.speed, 1);
+      await pac.setSpeed(3);
+      expect(pac.speed, 3);
+      expect(pac.isAzimuthReversed, isFalse);
+      await pac.setAzimuthReversed(true);
+      expect(pac.isAzimuthReversed, isTrue);
+      await pac.setAzimuthReversed(false);
+      expect(pac.isAltitudeReversed, isFalse);
+      await pac.setAltitudeReversed(true);
+      expect(pac.isAltitudeReversed, isTrue);
+      await pac.setAltitudeReversed(false);
+    });
+
+    test('PolarAligner without optional properties', () async {
+      const name = 'Bare PAC';
+      server.define(_switches(name, 'PAC_ABORT_MOTION', ['ABORT'],
+          rule: SwitchRule.atMostOne));
+      final pac = PolarAligner(await device(name, 'PAC_ABORT_MOTION'));
+      expect(pac.position, isNull);
+      expect(pac.speed, isNull);
+      expect(pac.isAzimuthReversed, isNull);
+      expect(pac.isAltitudeReversed, isNull);
     });
   });
 
@@ -965,7 +1183,9 @@ void main() {
       final rotator = Rotator(await device('Rotator', 'ROTATOR_REVERSE'));
       expect(await rotator.angleStream.first, 30);
       await rotator.abort();
+      expect(rotator.isReversed, isFalse);
       await rotator.setReversed(true);
+      expect(rotator.isReversed, isTrue);
 
       final gps = Gps(await device('Gps', 'GPS_REFRESH'));
       expect(gps.location, isNull);

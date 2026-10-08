@@ -330,3 +330,73 @@ final class SensorInfo {
   String toString() => 'SensorInfo(${width}x$height, '
       '${pixelSizeX}x$pixelSizeY µm, $bitsPerPixel bits)';
 }
+
+/// A digital input or output of an I/O device.
+///
+/// {@category Device wrappers}
+@immutable
+final class IoChannel {
+  /// Creates a channel.
+  const IoChannel({
+    required this.number,
+    required this.label,
+    required this.isOn,
+  });
+
+  /// The channel number, from 1.
+  final int number;
+
+  /// The name the user gave the channel, or the driver's default.
+  final String label;
+
+  /// Whether the channel is on.
+  final bool isOn;
+
+  @override
+  bool operator ==(Object other) =>
+      other is IoChannel &&
+      other.number == number &&
+      other.label == label &&
+      other.isOn == isOn;
+
+  @override
+  int get hashCode => Object.hash(number, label, isOn);
+
+  @override
+  String toString() => 'IoChannel($number, $label, ${isOn ? 'on' : 'off'})';
+}
+
+/// An analog input of an I/O device.
+///
+/// {@category Device wrappers}
+@immutable
+final class AnalogInput {
+  /// Creates an input.
+  const AnalogInput({
+    required this.number,
+    required this.label,
+    required this.value,
+  });
+
+  /// The input number, from 1.
+  final int number;
+
+  /// The name the user gave the input, or the driver's default.
+  final String label;
+
+  /// The reading.
+  final double value;
+
+  @override
+  bool operator ==(Object other) =>
+      other is AnalogInput &&
+      other.number == number &&
+      other.label == label &&
+      other.value == value;
+
+  @override
+  int get hashCode => Object.hash(number, label, value);
+
+  @override
+  String toString() => 'AnalogInput($number, $label, $value)';
+}

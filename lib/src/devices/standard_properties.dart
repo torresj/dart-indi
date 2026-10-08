@@ -262,11 +262,69 @@ abstract final class StandardProperties {
   /// Closes (parks) or opens (unparks) the cap (switch: PARK, UNPARK).
   static const capPark = 'CAP_PARK';
 
+  /// Stops the cap (switch: ABORT). Only drivers that can abort define it.
+  static const capAbort = 'CAP_ABORT';
+
   /// The light (switch: FLAT_LIGHT_ON, FLAT_LIGHT_OFF).
   static const flatLightControl = 'FLAT_LIGHT_CONTROL';
 
   /// The brightness (number: FLAT_LIGHT_INTENSITY_VALUE).
   static const flatLightIntensity = 'FLAT_LIGHT_INTENSITY';
+
+  // Inputs and outputs.
+
+  /// The prefix of the digital inputs, followed by the input number from
+  /// 1 (switch: OFF, ON; read only).
+  static const digitalInputPrefix = 'DIGITAL_INPUT_';
+
+  /// The prefix of the digital outputs, followed by the output number
+  /// from 1 (switch: OFF, ON).
+  static const digitalOutputPrefix = 'DIGITAL_OUTPUT_';
+
+  /// The prefix of the analog inputs, followed by the input number from 1
+  /// (number with one element; read only).
+  static const analogInputPrefix = 'ANALOG_INPUT_';
+
+  /// The prefix of the pulse durations, followed by the output number
+  /// **from 0** (number: DURATION, in milliseconds).
+  static const pulsePrefix = 'PULSE_';
+
+  /// The names of the digital inputs (text: DIGITAL_INPUT_1, …).
+  static const digitalInputLabels = 'DIGITAL_INPUT_LABELS';
+
+  /// The names of the digital outputs (text: DIGITAL_OUTPUT_1, …).
+  static const digitalOutputLabels = 'DIGITAL_OUTPUT_LABELS';
+
+  /// The names of the analog inputs (text: ANALOG_INPUT_1, …).
+  static const analogInputLabels = 'ANALOG_INPUT_LABELS';
+
+  // Sky quality meter.
+
+  /// The readings (number: SKY_BRIGHTNESS, SENSOR_FREQUENCY,
+  /// SENSOR_COUNTS, SENSOR_PERIOD, SKY_TEMPERATURE).
+  static const skyQuality = 'SKY_QUALITY';
+
+  // Polar alignment correction.
+
+  /// Moves each axis by an angle (number: MANUAL_AZ_STEP,
+  /// MANUAL_ALT_STEP, in degrees; write only).
+  static const pacManualAdjustment = 'PAC_MANUAL_ADJUSTMENT';
+
+  /// Stops the motion (switch: ABORT).
+  static const pacAbortMotion = 'PAC_ABORT_MOTION';
+
+  /// The motor speed (number: PAC_SPEED_VALUE).
+  static const pacSpeed = 'PAC_SPEED';
+
+  /// Reverses the azimuth axis (switch: INDI_ENABLED, INDI_DISABLED).
+  static const pacAzReverse = 'PAC_AZ_REVERSE';
+
+  /// Reverses the altitude axis (switch: INDI_ENABLED, INDI_DISABLED).
+  static const pacAltReverse = 'PAC_ALT_REVERSE';
+
+  /// The position of each axis, if the device knows it (number:
+  /// POSITION_AZ, POSITION_ALT, in degrees).
+  static const pacPosition = 'PAC_POSITION';
 }
 
 /// Names of the elements of the standard INDI properties. See
@@ -561,4 +619,49 @@ abstract final class StandardElements {
 
   /// FLAT_LIGHT_INTENSITY: brightness.
   static const flatLightIntensityValue = 'FLAT_LIGHT_INTENSITY_VALUE';
+
+  // Inputs and outputs.
+
+  /// DIGITAL_INPUT_n, DIGITAL_OUTPUT_n: on.
+  static const on = 'ON';
+
+  /// DIGITAL_INPUT_n, DIGITAL_OUTPUT_n: off.
+  static const off = 'OFF';
+
+  /// PULSE_n: the pulse length in milliseconds.
+  static const duration = 'DURATION';
+
+  // Sky quality meter.
+
+  /// SKY_QUALITY: sky brightness in magnitudes per square arcsecond.
+  static const skyBrightness = 'SKY_BRIGHTNESS';
+
+  /// SKY_QUALITY: sensor frequency in Hz.
+  static const sensorFrequency = 'SENSOR_FREQUENCY';
+
+  /// SKY_QUALITY: sensor period in counts.
+  static const sensorCounts = 'SENSOR_COUNTS';
+
+  /// SKY_QUALITY: sensor period in seconds.
+  static const sensorPeriod = 'SENSOR_PERIOD';
+
+  /// SKY_QUALITY: sensor temperature in °C.
+  static const skyTemperature = 'SKY_TEMPERATURE';
+
+  // Polar alignment correction.
+
+  /// PAC_MANUAL_ADJUSTMENT: azimuth step in degrees.
+  static const manualAzStep = 'MANUAL_AZ_STEP';
+
+  /// PAC_MANUAL_ADJUSTMENT: altitude step in degrees.
+  static const manualAltStep = 'MANUAL_ALT_STEP';
+
+  /// PAC_SPEED: speed.
+  static const pacSpeedValue = 'PAC_SPEED_VALUE';
+
+  /// PAC_POSITION: azimuth in degrees.
+  static const positionAz = 'POSITION_AZ';
+
+  /// PAC_POSITION: altitude in degrees.
+  static const positionAlt = 'POSITION_ALT';
 }

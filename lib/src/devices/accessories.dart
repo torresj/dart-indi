@@ -1,3 +1,4 @@
+import '../model/enums.dart';
 import 'device_wrapper.dart';
 import 'standard_properties.dart';
 
@@ -24,6 +25,19 @@ final class DustCap extends IndiDeviceWrapper {
         StandardProperties.capPark,
         StandardElements.unpark,
         timeout: timeout,
+      );
+
+  /// Whether the cap is opening or closing.
+  bool get isMoving =>
+      stateOf(StandardProperties.capPark) == PropertyState.busy;
+
+  /// Whether the driver can stop the cap while it moves.
+  bool get canAbort => device.getSwitch(StandardProperties.capAbort) != null;
+
+  /// Stops the cap. Only drivers where [canAbort] is true support it.
+  Future<void> abort() => device.setSwitch(
+        StandardProperties.capAbort,
+        StandardElements.abort,
       );
 }
 
