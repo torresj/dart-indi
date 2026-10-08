@@ -77,6 +77,26 @@ Future<Process> startServer() async {
   throw StateError('indiserver did not start');
 }
 
+/// Records the updates of [property] on [device], and prints them if the
+/// test fails, to show what the driver sent.
+void recordOnFailure(IndiDevice device, String property) {
+  final history = <String>[];
+  final recording = device.events.listen((event) {
+    if (event case PropertyEvent(property: final p) when p.name == property) {
+      final values = switch (p) {
+        NumberProperty() => p.elements.map((e) => '${e.name}=${e.value}'),
+        SwitchProperty() => p.elements.map((e) => '${e.name}=${e.isOn}'),
+        _ => const <String>[],
+      };
+      history.add('${event.runtimeType} ${p.state.name} ${values.join(' ')}');
+    }
+  });
+  addTearDown(recording.cancel);
+  addTearDown(
+    () => printOnFailure('$property history:\n${history.join('\n')}'),
+  );
+}
+
 Future<void> stopServer(Process process) async {
   process.kill(ProcessSignal.sigkill);
   await process.exitCode;
@@ -199,10 +219,15 @@ void _tests() {
     'moves the rotator',
     () async {
       final rotator = Rotator(await client.waitForDevice('Rotator Simulator'));
+      recordOnFailure(rotator.device, 'ABS_ROTATOR_ANGLE');
       await rotator.connect();
       await rotator.device.waitForProperty<NumberProperty>('ABS_ROTATOR_ANGLE');
       final target = ((rotator.angle ?? 0) + 10) % 360;
       await rotator.moveTo(target, timeout: const Duration(minutes: 1));
+      // INDI 1.9.9's simulator can report Ok once before it gets there.
+      await rotator.angleStream
+          .firstWhere((a) => (a - target).abs() < 0.01)
+          .timeout(const Duration(minutes: 1));
       expect(rotator.angle, closeTo(target, 0.01));
     },
     skip: _needs('indi_simulator_rotator'),
@@ -227,18 +252,7 @@ void _tests() {
     () async {
       final light =
           LightBox(await client.waitForDevice('Light Panel Simulator'));
-      // Record what the driver reports, to explain a failure.
-      final history = <String>[];
-      final recording = light.device.events.listen((event) {
-        if (event case PropertyEvent(:final SwitchProperty property)
-            when property.name == 'FLAT_LIGHT_CONTROL') {
-          history.add('${event.runtimeType} ${property.state.name} '
-              'on=${property.isOn('FLAT_LIGHT_ON')}');
-        }
-      });
-      addTearDown(recording.cancel);
-      addTearDown(() => printOnFailure(history.join('\n')));
-
+      recordOnFailure(light.device, 'FLAT_LIGHT_CONTROL');
       await light.connect();
       await light.device
           .waitForProperty<NumberProperty>('FLAT_LIGHT_INTENSITY');
@@ -247,6 +261,7 @@ void _tests() {
       expect(light.isOn, isTrue);
       expect(light.brightness, 128);
       await light.setLight(false);
+      // INDI 1.9.9's simulator can report the light on once more.
       await light.device
           .watch<SwitchProperty>('FLAT_LIGHT_CONTROL')
           .firstWhere((p) => !p.isOn('FLAT_LIGHT_ON'))
