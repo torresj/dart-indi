@@ -1,3 +1,11 @@
+## 0.1.4
+
+No API changes.
+
+- The integration tests wait for the rotator and light panel simulators
+  to reach their new state, which INDI 1.9.9 can report late, and print
+  the driver's updates when they fail.
+
 ## 0.1.3
 
 - New device wrappers:
