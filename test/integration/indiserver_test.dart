@@ -227,6 +227,18 @@ void _tests() {
     () async {
       final light =
           LightBox(await client.waitForDevice('Light Panel Simulator'));
+      // Record what the driver reports, to explain a failure.
+      final history = <String>[];
+      final recording = light.device.events.listen((event) {
+        if (event case PropertyEvent(:final SwitchProperty property)
+            when property.name == 'FLAT_LIGHT_CONTROL') {
+          history.add('${event.runtimeType} ${property.state.name} '
+              'on=${property.isOn('FLAT_LIGHT_ON')}');
+        }
+      });
+      addTearDown(recording.cancel);
+      addTearDown(() => printOnFailure(history.join('\n')));
+
       await light.connect();
       await light.device
           .waitForProperty<NumberProperty>('FLAT_LIGHT_INTENSITY');
@@ -235,6 +247,10 @@ void _tests() {
       expect(light.isOn, isTrue);
       expect(light.brightness, 128);
       await light.setLight(false);
+      await light.device
+          .watch<SwitchProperty>('FLAT_LIGHT_CONTROL')
+          .firstWhere((p) => !p.isOn('FLAT_LIGHT_ON'))
+          .timeout(const Duration(seconds: 10));
       expect(light.isOn, isFalse);
     },
     skip: _needs('indi_simulator_lightpanel'),
