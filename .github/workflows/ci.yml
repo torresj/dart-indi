@@ -21,7 +21,7 @@ jobs:
     name: Format, analyze and docs
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
       - uses: dart-lang/setup-dart@v1
       - run: dart pub get
       - name: Check formatting
@@ -48,7 +48,7 @@ jobs:
           - os: ubuntu-latest
             sdk: 3.5.0
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
       - uses: dart-lang/setup-dart@v1
         with:
           sdk: ${{ matrix.sdk }}
@@ -59,7 +59,7 @@ jobs:
     name: Test on the web (Chrome)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
       - uses: dart-lang/setup-dart@v1
       - run: dart pub get
       - run: dart test -p chrome -x integration
@@ -68,7 +68,7 @@ jobs:
     name: Coverage
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
       - uses: dart-lang/setup-dart@v1
       - run: dart pub get
       - run: dart pub global activate coverage
@@ -81,7 +81,7 @@ jobs:
               printf "Line coverage: %d/%d = %.1f%%\n", hit, found, coverage
               if (coverage < 95) { print "Coverage is below 95%"; exit 1 }
             }' coverage/lcov.info
-      - uses: codecov/codecov-action@v5
+      - uses: codecov/codecov-action@v7
         with:
           files: coverage/lcov.info
           disable_search: true
@@ -94,7 +94,7 @@ jobs:
     name: Integration (indiserver simulators)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
       - uses: dart-lang/setup-dart@v1
       - name: Install indiserver and websockify
         run: |
@@ -108,7 +108,7 @@ jobs:
     name: pub.dev score
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
       - uses: dart-lang/setup-dart@v1
       - run: dart pub global activate pana
       - run: dart pub global run pana --no-warning --exit-code-threshold 10 .
@@ -120,7 +120,7 @@ jobs:
       run:
         working-directory: example/flutter_app
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
       - uses: subosito/flutter-action@v2
         with:
           channel: stable
