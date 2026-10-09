@@ -1,3 +1,13 @@
+## 0.1.5
+
+- New `IndiClient.reconnectNow`, which makes the next reconnection attempt
+  at once instead of waiting for its delay. iOS and Android suspend or cut
+  the connections of an app in the background, and the waits grow while its
+  attempts fail, so apps call it when they return to the foreground. The
+  session resumes as usual, and the dedicated BLOB connection is retried
+  too.
+- The Flutter example calls it when the app returns to the foreground.
+
 ## 0.1.4
 
 No API changes.
