@@ -169,6 +169,33 @@ final class IndiClient {
     }
   }
 
+  /// Makes the next reconnection attempt now, instead of waiting for the
+  /// delay of [IndiClientOptions.reconnect].
+  ///
+  /// The waits grow while attempts fail, up to 30 seconds with the default
+  /// policy. Call this when conditions change and the server is likely
+  /// reachable again, typically when a mobile app returns to the
+  /// foreground: iOS and Android suspend or cut a background app's
+  /// connections, so the attempts made meanwhile fail.
+  ///
+  /// ```dart
+  /// // Flutter
+  /// final lifecycle = AppLifecycleListener(onResume: client.reconnectNow);
+  /// ```
+  ///
+  /// It is still a reconnection: the session resumes as usual, with
+  /// [SessionResumed]. The dedicated BLOB connection, if any, is retried
+  /// too. Returns whether an attempt was started; nothing happens while
+  /// connected, while an attempt is under way, or after the client gave
+  /// up, [disconnect] or [close]. If the attempt fails, the backoff goes on
+  /// from where it was.
+  bool reconnectNow() {
+    if (_closed) return false;
+    final main = _main.retryNow();
+    final blob = _blob?.retryNow() ?? false;
+    return main || blob;
+  }
+
   /// Disconnects from the server and stops reconnecting.
   ///
   /// Devices are removed, as the server state is unknown while

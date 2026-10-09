@@ -34,7 +34,8 @@ final image = await camera.expose(const Duration(seconds: 30));
 - **Automatic reconnection and session resume**: when the connection drops,
   the client reconnects with exponential backoff, requests the properties
   again, restores BLOB settings and removes whatever disappeared. Your
-  `IndiDevice` objects stay valid throughout.
+  `IndiDevice` objects stay valid throughout. `reconnectNow()` skips the
+  wait, for when an app returns to the foreground.
 - **Dead-link detection**: keep-alive pings detect connections that die
   silently, like a Wi-Fi drop.
 - **Awaitable commands**: `await mount.slewTo(...)` completes when the driver
@@ -237,6 +238,19 @@ When the connection drops:
 4. Once the definitions settle, anything that was not defined again is
    removed, and a `SessionResumed` event is emitted. The same `IndiDevice`
    objects are reused.
+
+The waits between attempts grow while they fail, up to `maxDelay`. iOS and
+Android suspend or cut the connections of an app in the background, so by the
+time it returns, the next attempt can be half a minute away. Call
+`reconnectNow()` when the app returns to try at once:
+
+```dart
+// Flutter: retry as soon as the app is back in the foreground.
+final lifecycle = AppLifecycleListener(onResume: client.reconnectNow);
+```
+
+It only acts while the client waits to reconnect, and the session resumes as
+usual.
 
 ### Flutter web
 

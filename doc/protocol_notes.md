@@ -47,6 +47,7 @@ indiserver's `ClInfo.cpp`.
 | indiserver 2.x answers a client's `pingRequest` with `pingReply`; older versions forward it to the drivers. | The heartbeat stops pinging after two unanswered pings, and only detects dead links on servers that answer. |
 | Servers send `pingRequest` to clients on the fast-BLOB Unix socket. | The client always answers with `pingReply`. |
 | indiserver disconnects clients that fall more than `-m` MB behind. | The decoder never blocks and processes data as it arrives. |
+| iOS and Android suspend or cut the connections of an app in the background, so its reconnection attempts fail and the backoff grows. | `IndiClient.reconnectNow` makes the next attempt at once when the app returns. |
 | `DRIVER_INFO.DRIVER_INTERFACE` is a bit mask of device kinds. | `DeviceInterface`, `IndiDevice.interfaces`, `IndiClient.devicesWith`. |
 
 ## Device wrappers

@@ -116,6 +116,19 @@ final class ConnectionSupervisor {
     return completer.future;
   }
 
+  /// Makes the next reconnection attempt now instead of waiting for its
+  /// delay. Returns whether an attempt was started: only while waiting to
+  /// retry. If it fails, the backoff goes on from where it was.
+  bool retryNow() {
+    final timer = _retryTimer;
+    if (!_wanted || _state is! IndiReconnecting || timer == null) return false;
+    if (!timer.isActive) return false;
+    timer.cancel();
+    _retryTimer = null;
+    unawaited(_connect());
+    return true;
+  }
+
   /// Disconnects and stops reconnecting. [start] can be called again.
   Future<void> stop() async {
     if (_closed) return;

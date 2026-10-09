@@ -24,6 +24,8 @@ What to look at:
 
 - `lib/src/devices_screen.dart`: device list and connection state, driven by
   `IndiClient.events` and `IndiClient.connectionStates`.
+- `lib/src/connect_screen.dart`: connecting, and `IndiClient.reconnectNow`
+  when the app returns to the foreground.
 - `lib/src/property_card.dart`: a generic editor for every property type,
   driven by `IndiDevice.watch`.
 - `test/widget_test.dart`: testing the UI against `FakeIndiServer`.

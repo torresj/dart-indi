@@ -243,6 +243,123 @@ void main() {
     });
   });
 
+  group('reconnectNow', () {
+    // A minute between attempts: only reconnectNow explains a quick one.
+    const patient = IndiClientOptions(
+      heartbeat: HeartbeatOptions.disabled(),
+      resumeSettleTime: Duration(milliseconds: 20),
+      reconnect: ReconnectPolicy(
+        initialDelay: Duration(minutes: 1),
+        maxDelay: Duration(minutes: 10),
+        jitter: 0,
+      ),
+    );
+
+    late FakeIndiServer server;
+
+    setUp(() {
+      server = FakeIndiServer();
+      defineMount(server);
+      defineCamera(server);
+    });
+
+    tearDown(() => server.close());
+
+    IndiClient patientClient([IndiClientOptions options = patient]) {
+      final client =
+          IndiClient.withTransport(server.transport, options: options);
+      addTearDown(client.close);
+      return client;
+    }
+
+    test('skips the wait before the next attempt', () async {
+      final client = patientClient();
+      final (mount, _) = await connectAndSync(client);
+      await server.dropConnections();
+      await eventually(() => client.connectionState is IndiReconnecting);
+      expect(
+        (client.connectionState as IndiReconnecting).delay,
+        const Duration(minutes: 1),
+      );
+
+      final resumed = client.eventsOf<SessionResumed>().first;
+      expect(client.reconnectNow(), isTrue);
+      final event = await resumed.timeout(const Duration(seconds: 5));
+      expect(event.attempts, 1);
+      expect(client.isConnected, isTrue);
+      expect(client.device(mountName), same(mount));
+      expect(mount.isAvailable, isTrue);
+    });
+
+    test('a failed attempt goes on with the backoff', () async {
+      final client = patientClient();
+      await connectAndSync(client);
+      server.refuseConnections = true;
+      await server.dropConnections();
+      await eventually(() => client.connectionState is IndiReconnecting);
+      final attempts = server.transport.connectAttempts;
+
+      expect(client.reconnectNow(), isTrue);
+      await eventually(
+        () => switch (client.connectionState) {
+          IndiReconnecting(:final attempt) => attempt == 2,
+          _ => false,
+        },
+      );
+      expect(server.transport.connectAttempts, attempts + 1);
+      expect(
+        (client.connectionState as IndiReconnecting).delay,
+        const Duration(minutes: 2),
+      );
+    });
+
+    test('does nothing unless waiting to reconnect', () async {
+      final client = patientClient();
+      expect(client.reconnectNow(), isFalse); // never connected
+      await connectAndSync(client);
+      expect(client.reconnectNow(), isFalse); // connected
+      await client.disconnect();
+      expect(client.reconnectNow(), isFalse);
+
+      final once = patientClient(
+        const IndiClientOptions(
+          heartbeat: HeartbeatOptions.disabled(),
+          reconnect: ReconnectPolicy(maxAttempts: 0),
+        ),
+      );
+      await once.connect();
+      await server.dropConnections();
+      await eventually(() => once.connectionState is IndiDisconnected);
+      expect(once.reconnectNow(), isFalse); // gave up
+
+      await once.close();
+      expect(once.reconnectNow(), isFalse);
+    });
+
+    test('retries the BLOB connection too', () async {
+      final client = patientClient(
+        const IndiClientOptions(
+          heartbeat: HeartbeatOptions.disabled(),
+          resumeSettleTime: Duration(milliseconds: 20),
+          separateBlobConnection: true,
+          reconnect: ReconnectPolicy(
+            initialDelay: Duration(minutes: 1),
+            maxDelay: Duration(minutes: 10),
+            jitter: 0,
+          ),
+        ),
+      );
+      await connectAndSync(client);
+      await eventually(() => server.connections.length == 2);
+      await server.dropConnections();
+      await eventually(() => client.connectionState is IndiReconnecting);
+
+      expect(client.reconnectNow(), isTrue);
+      await eventually(() => server.connections.length == 2);
+      await eventually(() => client.isConnected);
+    });
+  });
+
   group('heartbeat', () {
     const options = IndiClientOptions(
       heartbeat: HeartbeatOptions(interval: Duration(seconds: 10)),

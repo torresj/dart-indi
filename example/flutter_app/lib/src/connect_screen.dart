@@ -54,7 +54,12 @@ class _ConnectScreenState extends State<ConnectScreen> {
     if (!mounted) return;
     setState(() => _connecting = false);
     await Navigator.of(context).push(
-      MaterialPageRoute<void>(builder: (_) => DevicesScreen(client: client)),
+      MaterialPageRoute<void>(
+        builder: (_) => _ReconnectOnResume(
+          client: client,
+          child: DevicesScreen(client: client),
+        ),
+      ),
     );
     await client.close();
   }
@@ -107,4 +112,36 @@ class _ConnectScreenState extends State<ConnectScreen> {
       ),
     );
   }
+}
+
+/// Retries at once when the app returns to the foreground. The system cuts
+/// the connections of an app in the background, and without this the
+/// client would wait out its reconnection backoff.
+class _ReconnectOnResume extends StatefulWidget {
+  const _ReconnectOnResume({required this.client, required this.child});
+
+  final IndiClient client;
+  final Widget child;
+
+  @override
+  State<_ReconnectOnResume> createState() => _ReconnectOnResumeState();
+}
+
+class _ReconnectOnResumeState extends State<_ReconnectOnResume> {
+  late final AppLifecycleListener _lifecycle;
+
+  @override
+  void initState() {
+    super.initState();
+    _lifecycle = AppLifecycleListener(onResume: widget.client.reconnectNow);
+  }
+
+  @override
+  void dispose() {
+    _lifecycle.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => widget.child;
 }
